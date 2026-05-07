@@ -41,8 +41,8 @@ It's not just an assistant — it's an extension of your digital life.
 ## ⚡ Quick Start
 
 ```bash
-git clone https://github.com/FatihMakes/Mark-XXXIX.git
-cd Mark-XXXIX
+git clone https://github.com/erkinovshoxrux179-bot/Jarvis_Max.git
+cd Jarvis_Max
 pip install -r requirements.txt
 playwright install
 python main.py
