@@ -48,20 +48,20 @@ playwright install
 python main.py
 ```
 
-### 🛠️ Building Installer (Windows)
+### 🛠️ Building Installer (Windows) - Alternative with Inno Setup
 
-To create a Windows MSI installer with icon, shortcuts, and uninstaller:
+If cx_Freeze fails, use PyInstaller + Inno Setup:
 
-1. Add an `icon.ico` file to the root directory (create or download a suitable icon).
-2. Install cx_Freeze: `pip install cx_Freeze`
-3. Build the MSI: `python setup.py bdist_msi`
-4. The installer will be in `dist/` folder.
-5. Run the MSI to install with desktop and Start Menu shortcuts.
+1. Install Inno Setup from https://jrsoftware.org/isdl.php
+2. Install PyInstaller: `pip install pyinstaller`
+3. Build exe: `python build.py`
+4. Compile installer: Open `installer.iss` in Inno Setup and compile.
 
 The installer includes:
 - Application icon
-- Desktop shortcut
+- Desktop shortcut (optional)
 - Start Menu shortcut
+- Run after install option
 - Built-in uninstaller
 
 > ⚠️ **Installation Note:** To keep the repository lightweight, some OS-specific dependencies are not bundled in `requirements.txt`. If you run into a `ModuleNotFoundError`, simply install the missing package via `pip install <module_name>` for your specific system.
