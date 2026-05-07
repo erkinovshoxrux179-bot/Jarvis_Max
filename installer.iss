@@ -7,7 +7,6 @@ OutputDir=dist
 OutputBaseFilename=Mark_XXXIX_Installer
 Compression=lzma
 SolidCompression=yes
-SetupIconFile=ico.ico
 
 [Files]
 Source: "dist\Mark_XXXIX.exe"; DestDir: "{app}"; Flags: ignoreversion

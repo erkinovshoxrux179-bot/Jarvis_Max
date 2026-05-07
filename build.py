@@ -6,7 +6,6 @@ PyInstaller.__main__.run([
     'main.py',
     '--onefile',  # Single exe file
     '--windowed',  # No console window
-    '--icon=ico.ico',  # Icon
     '--name=Mark_XXXIX',  # Name
     '--add-data=core;core',  # Include core folder
     '--add-data=actions;actions',

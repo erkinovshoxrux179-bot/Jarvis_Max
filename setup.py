@@ -33,7 +33,6 @@ build_exe_options = {
         ("agent/", "agent/"),
         ("memory/", "memory/"),
         ("config/", "config/"),
-        ("ico.ico", "ico.ico"),  # Include the icon
     ],
     "excludes": [],
     "include_msvcr": True,
@@ -44,7 +43,6 @@ bdist_msi_options = {
     "upgrade_code": "{12345678-1234-1234-1234-123456789012}",  # Unique GUID
     "add_to_path": False,
     "initial_target_dir": r"[ProgramFilesFolder]\Mark XXXIX",
-    "install_icon": "ico.ico",
     "product_name": "Mark XXXIX",
 }
 
@@ -52,7 +50,6 @@ executables = [
     Executable(
         "main.py",
         base=None,  # Use None for console app, "Win32GUI" for GUI without console
-        icon="ico.ico",
         shortcut_name="Mark XXXIX",
         shortcut_dir="StartMenuFolder",
     )

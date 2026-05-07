@@ -58,7 +58,6 @@ If cx_Freeze fails, use PyInstaller + Inno Setup:
 4. Compile installer: Open `installer.iss` in Inno Setup and compile.
 
 The installer includes:
-- Application icon
 - Desktop shortcut (optional)
 - Start Menu shortcut
 - Run after install option
