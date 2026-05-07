@@ -12,10 +12,9 @@ PyInstaller.__main__.run([
     '--add-data=agent;agent',
     '--add-data=memory;memory',
     '--add-data=config;config',
-    '--hidden-import=google.generativeai',
+    '--hidden-import=google',
     '--hidden-import=sounddevice',
-    '--hidden-import=pyautogui',
-    # Add other hidden imports as needed
+    '--hidden-import=PyQt6',
 ])
 
 print("Exe built in dist/ folder")
