@@ -48,6 +48,22 @@ playwright install
 python main.py
 ```
 
+### 🛠️ Building Installer (Windows)
+
+To create a Windows MSI installer with icon, shortcuts, and uninstaller:
+
+1. Add an `icon.ico` file to the root directory (create or download a suitable icon).
+2. Install cx_Freeze: `pip install cx_Freeze`
+3. Build the MSI: `python setup.py bdist_msi`
+4. The installer will be in `dist/` folder.
+5. Run the MSI to install with desktop and Start Menu shortcuts.
+
+The installer includes:
+- Application icon
+- Desktop shortcut
+- Start Menu shortcut
+- Built-in uninstaller
+
 > ⚠️ **Installation Note:** To keep the repository lightweight, some OS-specific dependencies are not bundled in `requirements.txt`. If you run into a `ModuleNotFoundError`, simply install the missing package via `pip install <module_name>` for your specific system.
 
 ---

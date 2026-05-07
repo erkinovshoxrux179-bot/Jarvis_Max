@@ -811,6 +811,7 @@ def browser_control(
     action  = params.get("action", "").lower().strip()
     browser = params.get("browser", "").lower().strip() or None
     result  = "Unknown action."
+    confirmed = str(params.get("confirmed", "")).lower() in ("yes", "true", "1", "confirm")
 
     if action == "switch":
         target = browser or params.get("target", "").lower().strip()
@@ -824,6 +825,10 @@ def browser_control(
         return result
 
     if action == "close_all":
+        if not confirmed:
+            result = "This will close ALL browser sessions. Confirm by calling again with confirmed=yes."
+            _log(player, result)
+            return result
         result = _registry.close_all()
         _log(player, result)
         return result

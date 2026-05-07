@@ -212,6 +212,106 @@ def _send_messenger(receiver: str, message: str) -> str:
 
     return f"Message sent to {receiver} via Messenger."
 
+def _send_whatsapp_web(receiver: str, message: str, browser: str | None = None) -> str:
+    """
+    Best-effort WhatsApp Web sender via Playwright controller.
+    Requires the user to be logged into WhatsApp Web already.
+    """
+    from actions.browser_control import browser_control
+
+    browser_control({"action": "go_to", "browser": browser or "chrome", "url": "https://web.whatsapp.com/"})
+    time.sleep(2.5)
+
+    # Try to focus search and find chat
+    browser_control({"action": "smart_click", "description": "Search"})
+    time.sleep(0.5)
+    browser_control({"action": "smart_type", "description": "Search", "text": receiver})
+    time.sleep(1.0)
+    # click the chat by visible text
+    browser_control({"action": "click", "text": receiver})
+    time.sleep(0.8)
+    # type message into focused box
+    browser_control({"action": "type", "text": message, "clear_first": False})
+    browser_control({"action": "press", "key": "Enter"})
+    return f"Attempted WhatsApp Web send to {receiver}. If you were logged in, it should be delivered."
+
+
+def _send_telegram_web(receiver: str, message: str, browser: str | None = None) -> str:
+    """
+    Best-effort Telegram Web sender via Playwright controller.
+    Requires the user to be logged into Telegram Web already.
+    """
+    from actions.browser_control import browser_control
+
+    browser_control({"action": "go_to", "browser": browser or "chrome", "url": "https://web.telegram.org/k/"})
+    time.sleep(3.0)
+
+    browser_control({"action": "smart_click", "description": "Search"})
+    time.sleep(0.4)
+    browser_control({"action": "smart_type", "description": "Search", "text": receiver})
+    time.sleep(1.0)
+    browser_control({"action": "click", "text": receiver})
+    time.sleep(0.8)
+    browser_control({"action": "type", "text": message, "clear_first": False})
+    browser_control({"action": "press", "key": "Enter"})
+    return f"Attempted Telegram Web send to {receiver}. If you were logged in, it should be delivered."
+
+
+def _send_telegram_uia(receiver: str, message: str) -> str:
+    """
+    Telegram Desktop (Windows) best-effort send using UIA focus + key sequences.
+    This avoids coordinate clicking and usually works if Telegram is already installed.
+    """
+    from actions.windows_automation import windows_automation
+
+    # Focus Telegram window (if not found, try opening)
+    r = windows_automation({"action": "focus", "window_title": "Telegram", "timeout": 6})
+    if "no matching" in r.lower():
+        try:
+            from actions.open_app import open_app
+            open_app({"app_name": "Telegram"})
+            time.sleep(2.2)
+        except Exception:
+            pass
+        r = windows_automation({"action": "focus", "window_title": "Telegram", "timeout": 8})
+    # Open search (Telegram supports Ctrl+K to search chats)
+    windows_automation({"action": "keys", "window_title": "Telegram", "keys": "^k"})
+    time.sleep(0.2)
+    windows_automation({"action": "type", "window_title": "Telegram", "text": receiver, "clear_first": True})
+    time.sleep(0.6)
+    windows_automation({"action": "keys", "window_title": "Telegram", "keys": "{ENTER}"})
+    time.sleep(0.6)
+    windows_automation({"action": "type", "window_title": "Telegram", "text": message, "clear_first": False})
+    windows_automation({"action": "keys", "window_title": "Telegram", "keys": "{ENTER}"})
+    return f"{r}\nMessage sent to {receiver} via Telegram (UIA)."
+
+
+def _send_whatsapp_uia(receiver: str, message: str) -> str:
+    """
+    WhatsApp Desktop (Windows) best-effort send using UIA focus + key sequences.
+    WhatsApp desktop shortcuts vary by version; Ctrl+F often focuses chat search.
+    """
+    from actions.windows_automation import windows_automation
+
+    r = windows_automation({"action": "focus", "window_title": "WhatsApp", "timeout": 6})
+    if "no matching" in r.lower():
+        try:
+            from actions.open_app import open_app
+            open_app({"app_name": "WhatsApp"})
+            time.sleep(2.2)
+        except Exception:
+            pass
+        r = windows_automation({"action": "focus", "window_title": "WhatsApp", "timeout": 8})
+    windows_automation({"action": "keys", "window_title": "WhatsApp", "keys": "^f"})
+    time.sleep(0.2)
+    windows_automation({"action": "type", "window_title": "WhatsApp", "text": receiver, "clear_first": True})
+    time.sleep(0.7)
+    windows_automation({"action": "keys", "window_title": "WhatsApp", "keys": "{ENTER}"})
+    time.sleep(0.7)
+    windows_automation({"action": "type", "window_title": "WhatsApp", "text": message, "clear_first": False})
+    windows_automation({"action": "keys", "window_title": "WhatsApp", "keys": "{ENTER}"})
+    return f"{r}\nMessage sent to {receiver} via WhatsApp (UIA)."
+
 _PLATFORM_MAP = [
     ({"whatsapp", "wp", "wapp"},              _send_whatsapp),
     ({"telegram", "tg"},                      _send_telegram),
@@ -240,13 +340,13 @@ def send_message(
     receiver     = params.get("receiver", "").strip()
     message_text = params.get("message_text", "").strip()
     platform     = params.get("platform", "whatsapp").strip()
+    mode         = (params.get("mode") or params.get("strategy") or "").strip().lower()  # "desktop" | "web" | "uia" | ""
+    browser      = (params.get("browser") or "").strip().lower() or None
 
     if not receiver:
         return "Please specify a recipient."
     if not message_text:
         return "Please specify the message content."
-    if not _PYAUTOGUI:
-        return "PyAutoGUI is not installed — cannot control the desktop."
 
     preview = message_text[:50] + ("…" if len(message_text) > 50 else "")
     print(f"[SendMessage] 📨 {platform} → {receiver}: {preview}")
@@ -254,8 +354,59 @@ def send_message(
         player.write_log(f"[msg] {platform} → {receiver}")
 
     try:
-        handler = _resolve_platform(platform)
-        result  = handler(receiver, message_text)
+        pkey = platform.lower().strip()
+
+        # Explicit web mode
+        if mode == "web":
+            if "whatsapp" in pkey or pkey in ("wp", "wapp"):
+                result = _send_whatsapp_web(receiver, message_text, browser=browser)
+            elif "telegram" in pkey or pkey in ("tg",):
+                result = _send_telegram_web(receiver, message_text, browser=browser)
+            else:
+                result = "Web mode is currently supported for WhatsApp/Telegram only."
+
+        # Explicit UIA mode
+        elif mode == "uia":
+            if "telegram" in pkey or pkey in ("tg",):
+                result = _send_telegram_uia(receiver, message_text)
+            elif "whatsapp" in pkey or pkey in ("wp", "wapp"):
+                result = _send_whatsapp_uia(receiver, message_text)
+            else:
+                result = "UIA mode is currently supported for Telegram/WhatsApp only."
+
+        else:
+            # AUTO MODE: prefer UIA on Windows (desktop apps), then Web, then PyAutoGUI legacy
+            if "telegram" in pkey or pkey in ("tg",):
+                try:
+                    result = _send_telegram_uia(receiver, message_text)
+                    return result
+                except Exception:
+                    try:
+                        result = _send_telegram_web(receiver, message_text, browser=browser)
+                        return result
+                    except Exception:
+                        pass
+            if "whatsapp" in pkey or pkey in ("wp", "wapp"):
+                try:
+                    result = _send_whatsapp_uia(receiver, message_text)
+                    return result
+                except Exception:
+                    try:
+                        result = _send_whatsapp_web(receiver, message_text, browser=browser)
+                        return result
+                    except Exception:
+                        pass
+
+            if not _PYAUTOGUI:
+                # If desktop automation is unavailable, still try web for WA/TG as fallback
+                if "whatsapp" in pkey or pkey in ("wp", "wapp"):
+                    result = _send_whatsapp_web(receiver, message_text, browser=browser)
+                elif "telegram" in pkey or pkey in ("tg",):
+                    result = _send_telegram_web(receiver, message_text, browser=browser)
+                else:
+                    return "PyAutoGUI is not installed — cannot control the desktop."
+            handler = _resolve_platform(platform)
+            result  = handler(receiver, message_text)
     except Exception as e:
         result = f"Could not send message: {e}"
 

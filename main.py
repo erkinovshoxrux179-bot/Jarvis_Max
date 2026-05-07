@@ -31,6 +31,7 @@ from actions.dev_agent         import dev_agent
 from actions.web_search        import web_search as web_search_action
 from actions.computer_control  import computer_control
 from actions.game_updater      import game_updater
+from actions.windows_automation import windows_automation
 
 
 def get_base_dir():
@@ -219,6 +220,7 @@ TOOL_DECLARATIONS = [
                 "path":        {"type": "STRING", "description": "Save path for screenshot"},
                 "incognito":   {"type": "BOOLEAN", "description": "Open in private/incognito mode"},
                 "clear_first": {"type": "BOOLEAN", "description": "Clear field before typing (default: true)"},
+                "confirmed":   {"type": "STRING", "description": "Use confirmed=yes for dangerous actions like close_all"},
             },
             "required": ["action"]
         }
@@ -237,6 +239,7 @@ TOOL_DECLARATIONS = [
                 "name":        {"type": "STRING", "description": "File name to search for"},
                 "extension":   {"type": "STRING", "description": "File extension to search (e.g. .pdf)"},
                 "count":       {"type": "INTEGER", "description": "Number of results for largest"},
+                "confirmed":   {"type": "STRING", "description": "Use confirmed=yes for destructive actions like delete/move/rename/write"},
             },
             "required": ["action"]
         }
@@ -367,6 +370,36 @@ TOOL_DECLARATIONS = [
                 "save":        {"type": "BOOLEAN", "description": "Save results to Notepad"},
             },
             "required": ["origin", "destination", "date"]
+        }
+    },
+    {
+        "name": "windows_automation",
+        "description": (
+            "Windows UI automation via UIA (pywinauto). Use this on Windows for reliable automation "
+            "by window title and control identifiers (automation_id/control_text), instead of coordinate clicking. "
+            "Supports listing windows, focusing, minimizing/maximizing/closing/restoring, clicking controls, typing into controls, "
+            "sending key sequences, and dumping a compact control list for inspection."
+        ),
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "action": {
+                    "type": "STRING",
+                    "description": "list_windows | focus | close | minimize | maximize | restore | click | type | keys | dump_controls"
+                },
+                "window_title": {"type": "STRING", "description": "Substring to match a window title"},
+                "process": {"type": "STRING", "description": "Process name match (optional)"},
+                "timeout": {"type": "NUMBER", "description": "Wait timeout seconds (default: 8)"},
+                "limit": {"type": "INTEGER", "description": "Limit for list_windows (default: 25)"},
+                "control_text": {"type": "STRING", "description": "Exact control title/name"},
+                "automation_id": {"type": "STRING", "description": "UIA automation id"},
+                "control_type": {"type": "STRING", "description": "Button | Edit | ListItem | etc (optional)"},
+                "text": {"type": "STRING", "description": "Text to type (for type action)"},
+                "keys": {"type": "STRING", "description": "Key sequence for keys action (e.g. '^k', '{ENTER}', '^a{DEL}')"},
+                "clear_first": {"type": "BOOLEAN", "description": "Clear field before typing (default: true)"}
+                ,"confirmed": {"type": "STRING", "description": "Use confirmed=yes for dangerous actions like close"}
+            },
+            "required": ["action"]
         }
     },
     {
@@ -671,6 +704,10 @@ class JarvisLive:
 
             elif name == "flight_finder":
                 r = await loop.run_in_executor(None, lambda: flight_finder(parameters=args, player=self.ui))
+                result = r or "Done."
+
+            elif name == "windows_automation":
+                r = await loop.run_in_executor(None, lambda: windows_automation(parameters=args, player=self.ui))
                 result = r or "Done."
 
             elif name == "shutdown_jarvis":

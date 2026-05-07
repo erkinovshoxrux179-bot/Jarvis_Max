@@ -477,6 +477,7 @@ def file_controller(
     action = params.get("action", "").lower().strip()
     path   = params.get("path", "desktop")
     name   = params.get("name", "")
+    confirmed = str(params.get("confirmed", "")).lower() in ("yes", "true", "1", "confirm")
 
     if player:
         player.write_log(f"[file] {action} {name or path}")
@@ -492,21 +493,30 @@ def file_controller(
             return create_folder(path, name=name)
 
         elif action == "delete":
+            if not confirmed:
+                return "This will delete a file/folder (move to Trash). Confirm by calling again with confirmed=yes."
             return delete_file(path, name=name)
 
         elif action == "move":
+            if not confirmed:
+                return "This will move a file/folder. Confirm by calling again with confirmed=yes."
             return move_file(path, name=name, destination=params.get("destination", ""))
 
         elif action == "copy":
             return copy_file(path, name=name, destination=params.get("destination", ""))
 
         elif action == "rename":
+            if not confirmed:
+                return "This will rename a file/folder. Confirm by calling again with confirmed=yes."
             return rename_file(path, name=name, new_name=params.get("new_name", ""))
 
         elif action == "read":
             return read_file(path, name=name)
 
         elif action == "write":
+            # Potential overwrite; require confirm unless explicitly appending
+            if not params.get("append", False) and not confirmed:
+                return "This will write/overwrite a file. Confirm by calling again with confirmed=yes."
             return write_file(
                 path, name=name,
                 content=params.get("content", ""),
