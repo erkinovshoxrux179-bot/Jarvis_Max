@@ -32,5 +32,5 @@
     "cd /projects/sandbox/Jarvis_Max && python -c \"import ast; ast.parse(open('tray_service.py').read()); print('tray_service.py syntax OK')\""
   ],
   "blocked_reason": null,
-  "findings": "Required mesa-libGL, mesa-libEGL, libxkbcommon, and dbus-libs system packages for PyQt6 to import in the Amazon Linux sandbox. Qt.PenCapStyle.RoundCap is the correct enum path for pen cap styles in PyQt6 (not Qt.PenStyle.RoundCap). All verification commands pass successfully."
+  "findings": "Required mesa-libGL, mesa-libEGL, libxkbcommon, and dbus-libs system packages for PyQt6 to import in the Amazon Linux sandbox. Qt.PenCapStyle.RoundCap is the correct enum path for pen cap styles in PyQt6 (not Qt.PenStyle.RoundCap). All verification commands pass successfully. Review fixes applied: (1) show/hide use pyqtSignals for thread-safety, (2) QTimer.singleShot routed through _delayed_hide_signal, (3) overlay wired to TrayService via ui._win._tray.set_overlay(), (4) generation counter cancels stale delayed hides, (5) particle cap at 60, (6) timer stopped on fade-out/started on show."
 }
