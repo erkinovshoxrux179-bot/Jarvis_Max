@@ -1,4 +1,5 @@
 import asyncio
+import atexit
 import re
 import threading
 import json
@@ -957,6 +958,8 @@ def main():
         energy_threshold=600,
         cooldown_seconds=5.0,
     )
+
+    atexit.register(wake_detector.stop)
 
     def runner():
         ui.wait_for_api_key()

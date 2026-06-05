@@ -23,7 +23,6 @@ class TrayService:
         self._tray: QSystemTrayIcon | None = None
         self._hotkey_registered = False
         self._create_tray_icon()
-        self._register_startup()
 
     def _create_tray_icon(self):
         icon_path = _base_dir() / "ico.ico"
@@ -97,36 +96,6 @@ class TrayService:
         except Exception:
             # keyboard library may not work without root/admin or on non-Windows
             self._hotkey_registered = False
-
-    def _register_startup(self):
-        """Register JARVIS for Windows startup via registry (first run only)."""
-        try:
-            if sys.platform != "win32":
-                return
-            import winreg
-            key_path = r"Software\Microsoft\Windows\CurrentVersion\Run"
-            value_name = "MarkXXXIX_JARVIS"
-
-            key = winreg.OpenKey(
-                winreg.HKEY_CURRENT_USER, key_path, 0, winreg.KEY_READ
-            )
-            try:
-                winreg.QueryValueEx(key, value_name)
-                winreg.CloseKey(key)
-                return  # Already registered
-            except FileNotFoundError:
-                winreg.CloseKey(key)
-
-            # Register
-            exe_path = sys.executable if getattr(sys, "frozen", False) else ""
-            if exe_path:
-                key = winreg.OpenKey(
-                    winreg.HKEY_CURRENT_USER, key_path, 0, winreg.KEY_SET_VALUE
-                )
-                winreg.SetValueEx(key, value_name, 0, winreg.REG_SZ, f'"{exe_path}"')
-                winreg.CloseKey(key)
-        except Exception:
-            pass
 
     def cleanup(self):
         """Clean up tray icon and hotkey on shutdown."""

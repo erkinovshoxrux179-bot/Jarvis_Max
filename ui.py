@@ -1067,7 +1067,11 @@ class MainWindow(QMainWindow):
             self.showFullScreen()
 
     def closeEvent(self, event):
-        # Minimize to tray instead of closing
+        # If Ctrl is held, actually quit the application
+        if event.modifiers() & Qt.KeyboardModifier.ControlModifier:
+            QApplication.quit()
+            return
+        # Otherwise minimize to tray
         event.ignore()
         self.hide()
         self._tray.show_notification("JARVIS", "JARVIS is still running in the background. Use Win+J or tray icon to restore.")
@@ -1364,7 +1368,7 @@ class MainWindow(QMainWindow):
             l.setStyleSheet(f"color: {color}; background: transparent;")
             return l
 
-        lay.addWidget(_fl("[F4] Mute  ·  [F11] Fullscreen"))
+        lay.addWidget(_fl("[F4] Mute  ·  [F11] Fullscreen  ·  [Ctrl+Close] Exit"))
         lay.addStretch()
         lay.addWidget(_fl("FatihMakes Industries  ·  MARK XXXIX  ·  CLASSIFIED"))
         lay.addStretch()

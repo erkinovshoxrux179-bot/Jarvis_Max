@@ -12,8 +12,6 @@ This implementation uses energy-based detection as a lightweight trigger.
 
 from __future__ import annotations
 
-import audioop
-import struct
 import threading
 import time
 from typing import Callable, List, Optional
@@ -139,13 +137,10 @@ class WakeWordDetector:
             if self._stop_event.is_set():
                 raise sd.CallbackAbort()
 
-            # Convert numpy array to bytes for audioop
-            # indata is float32, convert to int16 for audioop.rms
+            # Compute RMS directly from the numpy float32 array
             try:
                 import numpy as np
-                audio_int16 = (indata[:, 0] * 32767).astype(np.int16)
-                audio_bytes = audio_int16.tobytes()
-                rms = audioop.rms(audio_bytes, 2)  # 2 bytes per sample (int16)
+                rms = int(np.sqrt(np.mean(indata[:, 0] ** 2)) * 32767)
             except Exception:
                 consecutive_active = 0
                 return

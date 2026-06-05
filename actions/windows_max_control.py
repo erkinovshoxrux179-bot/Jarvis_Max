@@ -8,8 +8,10 @@ firewall, Windows Defender, taskbar, context menu, and system information.
 
 from __future__ import annotations
 
+import ctypes
 import os
 import platform
+import re
 import subprocess
 import json
 from typing import Any
@@ -22,6 +24,28 @@ def _require_windows() -> None:
         raise RuntimeError(
             f"windows_max_control is only supported on Windows (current: {_OS})."
         )
+
+
+def _check_admin() -> bool:
+    """Check if the current process is running with Administrator privileges."""
+    try:
+        return bool(ctypes.windll.shell32.IsUserAnAdmin())
+    except Exception:
+        return False
+
+
+def _sanitize_ps(value: str) -> str:
+    """Escape a value for safe interpolation inside a PowerShell single-quoted string.
+
+    Single quotes are escaped by doubling them, then the value is wrapped in
+    single quotes so no other characters are interpreted.
+    """
+    return "'" + value.replace("'", "''") + "'"
+
+
+def _sanitize_cmd(value: str) -> str:
+    """Remove dangerous shell meta-characters from a value used in CMD commands."""
+    return re.sub(r"[;|&`$()]", "", value)
 
 
 def _run_powershell(command: str, timeout: float = 30.0) -> str:
@@ -75,21 +99,24 @@ def manage_services(params: dict, player=None) -> str:
         query = params.get("filter", "")
         cmd = "Get-Service"
         if query:
-            cmd += f" | Where-Object {{$_.DisplayName -like '*{query}*' -or $_.Name -like '*{query}*'}}"
+            safe_query = _sanitize_ps(query)
+            cmd += f" | Where-Object {{$_.DisplayName -like '*' + {safe_query} + '*' -or $_.Name -like '*' + {safe_query} + '*'}}"
         cmd += " | Select-Object -First 50 Name, DisplayName, Status | Format-Table -AutoSize"
         return _run_powershell(cmd)
 
     if not service_name:
         return "Error: service_name is required for start/stop/restart."
 
+    safe_name = _sanitize_ps(service_name)
+
     if sub_action == "start":
-        return _run_powershell(f"Start-Service -Name '{service_name}' -PassThru | Format-Table Name, Status")
+        return _run_powershell(f"Start-Service -Name {safe_name} -PassThru | Format-Table Name, Status")
     elif sub_action == "stop":
-        return _run_powershell(f"Stop-Service -Name '{service_name}' -Force -PassThru | Format-Table Name, Status")
+        return _run_powershell(f"Stop-Service -Name {safe_name} -Force -PassThru | Format-Table Name, Status")
     elif sub_action == "restart":
-        return _run_powershell(f"Restart-Service -Name '{service_name}' -Force -PassThru | Format-Table Name, Status")
+        return _run_powershell(f"Restart-Service -Name {safe_name} -Force -PassThru | Format-Table Name, Status")
     elif sub_action == "status":
-        return _run_powershell(f"Get-Service -Name '{service_name}' | Format-List Name, DisplayName, Status, StartType")
+        return _run_powershell(f"Get-Service -Name {safe_name} | Format-List Name, DisplayName, Status, StartType")
     else:
         return f"Unknown sub_action for services: '{sub_action}'. Use list/start/stop/restart/status."
 
@@ -413,12 +440,15 @@ def manage_env_vars(params: dict, player=None) -> str:
             return "Error: 'value' is required for set."
         # Set for current process
         os.environ[var_name] = value
-        # Persist with setx
-        result = _run_cmd(f'setx {var_name} "{value}"')
+        # Persist with setx (sanitize both name and value for CMD)
+        safe_name = _sanitize_cmd(var_name)
+        safe_value = _sanitize_cmd(value)
+        result = _run_cmd(f'setx {safe_name} "{safe_value}"')
         return f"Environment variable '{var_name}' set to '{value}'. {result}"
 
     elif sub_action == "delete":
-        cmd = f"[System.Environment]::SetEnvironmentVariable('{var_name}', $null, 'User')"
+        safe_var = _sanitize_ps(var_name)
+        cmd = f"[System.Environment]::SetEnvironmentVariable({safe_var}, $null, 'User')"
         result = _run_powershell(cmd)
         if var_name in os.environ:
             del os.environ[var_name]
@@ -444,7 +474,8 @@ def list_installed_apps(params: dict, player=None) -> str:
         "| Where-Object { $_.DisplayName -ne $null } "
     )
     if filter_text:
-        cmd += f"| Where-Object {{ $_.DisplayName -like '*{filter_text}*' }} "
+        safe_filter = _sanitize_ps(filter_text)
+        cmd += f"| Where-Object {{ $_.DisplayName -like '*' + {safe_filter} + '*' }} "
     cmd += "| Select-Object -First 50 DisplayName, DisplayVersion, Publisher | Sort-Object DisplayName | Format-Table -AutoSize"
 
     return _run_powershell(cmd)
@@ -493,17 +524,21 @@ def windows_update_status(params: dict, player=None) -> str:
 def manage_firewall(params: dict, player=None) -> str:
     """Manage Windows Firewall settings."""
     _require_windows()
+
+    if not _check_admin():
+        return "This operation requires Administrator privileges. Please run JARVIS as Administrator."
+
     sub_action = (params.get("sub_action") or "status").lower().strip()
 
     if sub_action == "status":
         return _run_cmd("netsh advfirewall show allprofiles state")
 
     elif sub_action == "enable":
-        profile = params.get("profile", "allprofiles")
+        profile = _sanitize_cmd(params.get("profile", "allprofiles"))
         return _run_cmd(f"netsh advfirewall set {profile} state on")
 
     elif sub_action == "disable":
-        profile = params.get("profile", "allprofiles")
+        profile = _sanitize_cmd(params.get("profile", "allprofiles"))
         return _run_cmd(f"netsh advfirewall set {profile} state off")
 
     elif sub_action == "add_rule":
@@ -518,9 +553,15 @@ def manage_firewall(params: dict, player=None) -> str:
         if not port:
             return "Error: port is required."
 
+        safe_rule_name = _sanitize_cmd(rule_name)
+        safe_direction = _sanitize_cmd(direction)
+        safe_action = _sanitize_cmd(action)
+        safe_protocol = _sanitize_cmd(protocol)
+        safe_port = _sanitize_cmd(port)
+
         cmd = (
-            f'netsh advfirewall firewall add rule name="{rule_name}" '
-            f'dir={direction} action={action} protocol={protocol} localport={port}'
+            f'netsh advfirewall firewall add rule name="{safe_rule_name}" '
+            f'dir={safe_direction} action={safe_action} protocol={safe_protocol} localport={safe_port}'
         )
         return _run_cmd(cmd)
 
@@ -528,13 +569,15 @@ def manage_firewall(params: dict, player=None) -> str:
         rule_name = (params.get("rule_name") or "").strip()
         if not rule_name:
             return "Error: rule_name is required."
-        return _run_cmd(f'netsh advfirewall firewall delete rule name="{rule_name}"')
+        safe_rule_name = _sanitize_cmd(rule_name)
+        return _run_cmd(f'netsh advfirewall firewall delete rule name="{safe_rule_name}"')
 
     elif sub_action == "list_rules":
         filter_text = params.get("filter", "")
         cmd = "netsh advfirewall firewall show rule name=all"
         if filter_text:
-            cmd += f' | findstr /i "{filter_text}"'
+            safe_filter = _sanitize_cmd(filter_text)
+            cmd += f' | findstr /i "{safe_filter}"'
         return _run_cmd(cmd)
 
     else:
@@ -548,6 +591,10 @@ def manage_firewall(params: dict, player=None) -> str:
 def manage_defender(params: dict, player=None) -> str:
     """Manage Windows Defender settings and scans."""
     _require_windows()
+
+    if not _check_admin():
+        return "This operation requires Administrator privileges. Please run JARVIS as Administrator."
+
     sub_action = (params.get("sub_action") or "status").lower().strip()
 
     if sub_action == "status":

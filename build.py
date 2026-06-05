@@ -26,7 +26,6 @@ PyInstaller.__main__.run([
     '--hidden-import=plyer',
     '--hidden-import=plyer.platforms.win.notification',
     '--hidden-import=keyboard',
-    '--hidden-import=audioop',
 ])
 
 print("Exe built in dist/ folder")
