@@ -10,7 +10,6 @@ from pathlib import Path
 import sounddevice as sd
 from google import genai
 from google.genai import types
-from PyQt6.QtCore import QTimer
 from ui import JarvisUI
 from memory.memory_manager import (
     load_memory, update_memory, format_memory_for_prompt,
@@ -589,7 +588,8 @@ class JarvisLive:
             if not self.ui.muted:
                 self.ui.set_state("LISTENING")
             if self.overlay:
-                QTimer.singleShot(2000, self.overlay.hide_overlay)
+                self.overlay.set_state("IDLE")
+                self.overlay.schedule_delayed_hide(2000)
 
     def speak(self, text: str):
         if not self._loop or not self.session:
@@ -957,6 +957,10 @@ class JarvisLive:
 def main():
     ui = JarvisUI("face.png")
     overlay = SiriOverlay()
+
+    # Wire overlay to TrayService so "Activate JARVIS" menu item works
+    if hasattr(ui._win, '_tray') and ui._win._tray:
+        ui._win._tray.set_overlay(overlay)
 
     # Wake word detection - activates UI when "Jarvis" is heard
     def _on_wake_word():

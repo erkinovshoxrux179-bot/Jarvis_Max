@@ -50,14 +50,20 @@ class _Particle:
         return self.life > 0
 
 
+_MAX_PARTICLES = 60
+
+
 class SiriOverlay(QWidget):
     """Frameless, always-on-top animated overlay widget.
 
     States: LISTENING, SPEAKING, THINKING, IDLE
     """
 
-    # Signal for thread-safe state changes from non-GUI threads
+    # Signals for thread-safe calls from non-GUI threads
     _state_signal = pyqtSignal(str)
+    _show_signal = pyqtSignal()
+    _hide_signal = pyqtSignal()
+    _delayed_hide_signal = pyqtSignal(int)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -76,10 +82,12 @@ class SiriOverlay(QWidget):
         self._particles: list[_Particle] = []
         self._arc_angle = 0.0
 
-        # Animation timer (16ms ~ 60fps)
+        # Generation counter to guard against stale delayed hides
+        self._generation = 0
+
+        # Animation timer (16ms ~ 60fps) - starts stopped, activated on show
         self._timer = QTimer(self)
         self._timer.timeout.connect(self._step)
-        self._timer.start(16)
 
         # Fade animations
         self._fade_in_anim = QPropertyAnimation(self, b"windowOpacity")
@@ -95,43 +103,90 @@ class SiriOverlay(QWidget):
         self._fade_out_anim.setEasingCurve(QEasingCurve.Type.InCubic)
         self._fade_out_anim.finished.connect(self._on_fade_out_done)
 
-        # Connect signal for thread safety
+        # Connect signals for thread safety
         self._state_signal.connect(self._apply_state)
+        self._show_signal.connect(self._do_show)
+        self._hide_signal.connect(self._do_hide)
+        self._delayed_hide_signal.connect(self._schedule_delayed_hide_on_gui)
 
     # ------------------------------------------------------------------
-    # Public API
+    # Public API (thread-safe - can be called from any thread)
     # ------------------------------------------------------------------
 
     def show_overlay(self):
-        """Position at screen bottom-center, fade in, and start animating."""
-        self._position_bottom_center()
-        self.setWindowOpacity(0.0)
-        self.show()
-        self._fade_out_anim.stop()
-        self._fade_in_anim.start()
+        """Thread-safe: position at screen bottom-center, fade in, and start animating."""
+        self._show_signal.emit()
 
     def hide_overlay(self):
-        """Fade out, then hide the widget."""
-        self._fade_in_anim.stop()
-        self._fade_out_anim.start()
+        """Thread-safe: fade out, then hide the widget."""
+        self._hide_signal.emit()
 
     def set_state(self, state: str):
         """Thread-safe state change. Emits signal so UI updates on main thread."""
         self._state_signal.emit(state)
 
     # ------------------------------------------------------------------
-    # Internal
+    # Internal (always runs on GUI thread via signals)
     # ------------------------------------------------------------------
+
+    def _do_show(self):
+        """Actually show the overlay - runs on GUI thread."""
+        self._generation += 1
+        self._position_bottom_center()
+        self.setWindowOpacity(0.0)
+        self.show()
+        self._fade_out_anim.stop()
+        self._fade_in_anim.start()
+        if not self._timer.isActive():
+            self._timer.start(16)
+
+    def _do_hide(self):
+        """Actually hide the overlay - runs on GUI thread.
+        
+        Guards against stale hides: no-op if the overlay is in an active state.
+        """
+        if self._state in ("SPEAKING", "LISTENING", "THINKING"):
+            return
+        self._fade_in_anim.stop()
+        self._fade_out_anim.start()
+
+    def schedule_delayed_hide(self, delay_ms: int = 2000):
+        """Thread-safe: schedule a hide after delay_ms.
+        
+        Uses generation counter so that if the state changes before the
+        timer fires, the hide is effectively cancelled.
+        """
+        self._delayed_hide_signal.emit(delay_ms)
+
+    def _schedule_delayed_hide_on_gui(self, delay_ms: int):
+        """Runs on GUI thread: sets up the QTimer.singleShot with generation guard."""
+        gen = self._generation
+
+        def _maybe_hide():
+            if self._generation == gen and self._state not in ("SPEAKING", "LISTENING", "THINKING"):
+                self._do_hide_force()
+
+        QTimer.singleShot(delay_ms, _maybe_hide)
 
     def _apply_state(self, state: str):
         """Apply state on the GUI thread."""
         self._state = state
+        # Bump generation on any active state to invalidate pending delayed hides
+        if state in ("SPEAKING", "LISTENING", "THINKING"):
+            self._generation += 1
         if state == "IDLE":
-            self.hide_overlay()
+            self._do_hide_force()
         self._particles.clear()
+
+    def _do_hide_force(self):
+        """Unconditional hide (used by IDLE state transition)."""
+        self._fade_in_anim.stop()
+        self._fade_out_anim.start()
 
     def _on_fade_out_done(self):
         self.hide()
+        # Stop the animation timer when hidden to save CPU
+        self._timer.stop()
 
     def _position_bottom_center(self):
         screen = QApplication.primaryScreen()
@@ -152,11 +207,12 @@ class SiriOverlay(QWidget):
         # Update particles
         self._particles = [p for p in self._particles if p.step()]
 
-        # Spawn new particles in SPEAKING state
+        # Spawn new particles in SPEAKING state (capped)
         if self._state == "SPEAKING" and self._tick % 3 == 0:
-            cx = self.width() / 2.0
-            cy = self.height() / 2.0 - 15
-            self._particles.append(_Particle(cx, cy))
+            if len(self._particles) < _MAX_PARTICLES:
+                cx = self.width() / 2.0
+                cy = self.height() / 2.0 - 15
+                self._particles.append(_Particle(cx, cy))
 
         self.update()
 
