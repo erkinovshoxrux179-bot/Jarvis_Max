@@ -24,3 +24,6 @@ python-pptx
 pyqt6
 cx_Freeze
 pyinstaller
+pystray
+plyer
+keyboard
