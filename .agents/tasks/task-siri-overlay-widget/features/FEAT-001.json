@@ -2,7 +2,7 @@
   "id": "FEAT-001",
   "type": "feat",
   "description": "Create a new overlay_widget.py file implementing a Siri-like floating overlay that appears when wake word is detected. This is a frameless, always-on-top, transparent-background PyQt6 widget that shows an animated orb/waveform at the bottom-center of the screen. Integrates with main.py wake word callback and JarvisLive session state changes.",
-  "status": "in_progress",
+  "status": "completed",
   "steps": [
     "Create /projects/sandbox/Jarvis_Max/overlay_widget.py with a SiriOverlay class (QWidget subclass). Requirements: Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint | Qt.WindowType.Tool; setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground); Fixed size ~300x300; Positioned at bottom-center of screen (above taskbar).",
     "Implement QPainter-based animated orb rendering with states: LISTENING (pulsating cyan/blue breathing orb), SPEAKING (active animated waveform with more movement, orange accent), THINKING (rotating/loading animation, yellow accent), IDLE (hidden/fading). Use the color palette from class C in ui.py (C.PRI=#00d4ff, C.ACC=#ff6b00, C.ACC2=#ffcc00, C.GREEN=#00ff88).",
@@ -32,5 +32,5 @@
     "cd /projects/sandbox/Jarvis_Max && python -c \"import ast; ast.parse(open('tray_service.py').read()); print('tray_service.py syntax OK')\""
   ],
   "blocked_reason": null,
-  "findings": ""
+  "findings": "Required mesa-libGL, mesa-libEGL, libxkbcommon, and dbus-libs system packages for PyQt6 to import in the Amazon Linux sandbox. Qt.PenCapStyle.RoundCap is the correct enum path for pen cap styles in PyQt6 (not Qt.PenStyle.RoundCap). All verification commands pass successfully."
 }
