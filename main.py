@@ -32,6 +32,8 @@ from actions.web_search        import web_search as web_search_action
 from actions.computer_control  import computer_control
 from actions.game_updater      import game_updater
 from actions.windows_automation import windows_automation
+from actions.windows_max_control import windows_max_control
+from wake_word import WakeWordDetector
 
 
 def get_base_dir():
@@ -403,6 +405,41 @@ TOOL_DECLARATIONS = [
         }
     },
     {
+        "name": "windows_max_control",
+        "description": (
+            "Advanced Windows system control. Use for: managing Windows services, "
+            "registry operations, sending notifications, clipboard management, "
+            "virtual desktops, startup programs, environment variables, "
+            "listing installed apps, Windows Update status, firewall/defender control, "
+            "taskbar management, context menu customization, and system information. "
+            "Always use this for deep Windows system operations."
+        ),
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "action": {
+                    "type": "STRING",
+                    "description": (
+                        "services | registry | notification | clipboard | virtual_desktop | "
+                        "startup | env_vars | installed_apps | windows_update | firewall | "
+                        "defender | taskbar | context_menu | system_info"
+                    )
+                },
+                "sub_action": {
+                    "type": "STRING",
+                    "description": "Sub-action specific to each action type (e.g., list/start/stop for services)"
+                },
+                "name": {"type": "STRING", "description": "Service name, app name, variable name, etc."},
+                "value": {"type": "STRING", "description": "Value to set (for registry, env_vars, etc.)"},
+                "key_path": {"type": "STRING", "description": "Registry key path"},
+                "title": {"type": "STRING", "description": "Notification title"},
+                "message": {"type": "STRING", "description": "Notification message or content"},
+                "confirmed": {"type": "STRING", "description": "Use confirmed=yes for dangerous operations"},
+            },
+            "required": ["action"]
+        }
+    },
+    {
         "name": "shutdown_jarvis",
         "description": (
             "Shuts down the assistant completely. "
@@ -710,6 +747,10 @@ class JarvisLive:
                 r = await loop.run_in_executor(None, lambda: windows_automation(parameters=args, player=self.ui))
                 result = r or "Done."
 
+            elif name == "windows_max_control":
+                r = await loop.run_in_executor(None, lambda: windows_max_control(parameters=args, player=self.ui))
+                result = r or "Done."
+
             elif name == "shutdown_jarvis":
                 self.ui.write_log("SYS: Shutdown requested.")
                 self.speak("Goodbye, sir.")
@@ -903,13 +944,32 @@ class JarvisLive:
 def main():
     ui = JarvisUI("face.png")
 
+    # Wake word detection - activates UI when "Jarvis" is heard
+    def _on_wake_word():
+        print("[JARVIS] Wake word detected!")
+        ui.show_from_tray()
+        ui.set_state("LISTENING")
+        ui.write_log("SYS: Wake word detected - JARVIS activated.")
+
+    wake_detector = WakeWordDetector(
+        callback=_on_wake_word,
+        keywords=["jarvis", "hey jarvis", "salom jarvis"],
+        energy_threshold=600,
+        cooldown_seconds=5.0,
+    )
+
     def runner():
         ui.wait_for_api_key()
+        # Start wake word detection after API key is set
+        wake_detector.start()
+        ui.write_log("SYS: Wake word detection active. Say 'Jarvis' to activate.")
+
         jarvis = JarvisLive(ui)
         try:
             asyncio.run(jarvis.run())
         except KeyboardInterrupt:
-            print("\n🔴 Shutting down...")
+            print("\n[JARVIS] Shutting down...")
+            wake_detector.stop()
 
     threading.Thread(target=runner, daemon=True).start()
     ui.root.mainloop()

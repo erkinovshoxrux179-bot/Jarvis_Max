@@ -13,6 +13,8 @@ from pathlib import Path
 
 import psutil
 
+from tray_service import TrayService
+
 from PyQt6.QtCore import (
     QEasingCurve, QMimeData, QObject, QPointF, QRectF, QSize, Qt,
     QTimer, QUrl, pyqtSignal,
@@ -1054,11 +1056,26 @@ class MainWindow(QMainWindow):
         sc_full = QShortcut(QKeySequence("F11"), self)
         sc_full.activated.connect(self._toggle_fullscreen)
 
+        # System tray integration
+        self._tray = TrayService(self)
+        self._tray.setup_global_hotkey()
+
     def _toggle_fullscreen(self):
         if self.isFullScreen():
             self.showNormal()
         else:
             self.showFullScreen()
+
+    def closeEvent(self, event):
+        # Minimize to tray instead of closing
+        event.ignore()
+        self.hide()
+        self._tray.show_notification("JARVIS", "JARVIS is still running in the background. Use Win+J or tray icon to restore.")
+
+    def show_from_tray(self):
+        self.show()
+        self.raise_()
+        self.activateWindow()
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
@@ -1501,3 +1518,6 @@ class JarvisUI:
     def stop_speaking(self):
         if not self.muted:
             self.set_state("LISTENING")
+
+    def show_from_tray(self):
+        self._win.show_from_tray()
