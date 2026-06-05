@@ -1,0 +1,7 @@
+{
+  "task_id": "task-siri-overlay-widget",
+  "task_description": "Create a Siri-like animated overlay popup for JARVIS that appears when wake word is detected. The overlay shows at the bottom-center of the screen as a frameless transparent widget with animated orb/waveform, transitions between LISTENING/SPEAKING/THINKING states, and fades out when done.",
+  "status": "in_progress",
+  "feature_order": ["FEAT-001"],
+  "blocked_reason": null
+}

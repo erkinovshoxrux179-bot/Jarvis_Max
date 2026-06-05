@@ -18,8 +18,9 @@ def _base_dir() -> Path:
 class TrayService:
     """Manages the system tray icon and global hotkey for JARVIS."""
 
-    def __init__(self, window: 'MainWindow'):
+    def __init__(self, window: 'MainWindow', overlay=None):
         self._window = window
+        self._overlay = overlay
         self._tray: QSystemTrayIcon | None = None
         self._hotkey_registered = False
         self._create_tray_icon()
@@ -38,6 +39,10 @@ class TrayService:
 
     def _create_context_menu(self) -> QMenu:
         menu = QMenu()
+
+        activate_action = QAction("Activate JARVIS", menu)
+        activate_action.triggered.connect(self._activate_jarvis)
+        menu.addAction(activate_action)
 
         show_action = QAction("Show/Hide JARVIS", menu)
         show_action.triggered.connect(self._toggle_window)
@@ -70,6 +75,17 @@ class TrayService:
             self._window.hide()
         else:
             self._window.show_from_tray()
+
+    def _activate_jarvis(self):
+        """Show the overlay widget to activate JARVIS."""
+        self._window.show_from_tray()
+        if self._overlay:
+            self._overlay.show_overlay()
+            self._overlay.set_state("LISTENING")
+
+    def set_overlay(self, overlay):
+        """Set or update the overlay reference."""
+        self._overlay = overlay
 
     def _toggle_mute(self):
         self._window._toggle_mute()

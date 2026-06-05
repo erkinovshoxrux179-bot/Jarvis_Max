@@ -1,0 +1,36 @@
+{
+  "id": "FEAT-001",
+  "type": "feat",
+  "description": "Create a new overlay_widget.py file implementing a Siri-like floating overlay that appears when wake word is detected. This is a frameless, always-on-top, transparent-background PyQt6 widget that shows an animated orb/waveform at the bottom-center of the screen. Integrates with main.py wake word callback and JarvisLive session state changes.",
+  "status": "in_progress",
+  "steps": [
+    "Create /projects/sandbox/Jarvis_Max/overlay_widget.py with a SiriOverlay class (QWidget subclass). Requirements: Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint | Qt.WindowType.Tool; setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground); Fixed size ~300x300; Positioned at bottom-center of screen (above taskbar).",
+    "Implement QPainter-based animated orb rendering with states: LISTENING (pulsating cyan/blue breathing orb), SPEAKING (active animated waveform with more movement, orange accent), THINKING (rotating/loading animation, yellow accent), IDLE (hidden/fading). Use the color palette from class C in ui.py (C.PRI=#00d4ff, C.ACC=#ff6b00, C.ACC2=#ffcc00, C.GREEN=#00ff88).",
+    "Add QTimer(16ms) animation loop similar to HudCanvas._step() in ui.py. The orb should have: radial gradient glow, pulsating size changes, particle effects when SPEAKING, smooth sine-wave based breathing in LISTENING mode.",
+    "Implement smooth fade-in (QPropertyAnimation on windowOpacity, 0.0 -> 1.0, ~300ms) when overlay appears, and smooth fade-out (1.0 -> 0.0, ~500ms) when dismissing. After fade-out completes, hide the widget.",
+    "Add a small status text label below the orb showing state: 'Listening...' / 'Jarvis is thinking...' / 'Speaking...' rendered with QPainter in Courier New font.",
+    "Add public methods: show_overlay() triggers fade-in and positions widget at screen bottom-center; hide_overlay() triggers fade-out; set_state(state: str) changes animation state (LISTENING/SPEAKING/THINKING/IDLE); Use pyqtSignal for thread-safe state changes from non-GUI threads.",
+    "Update /projects/sandbox/Jarvis_Max/main.py: (a) Import SiriOverlay from overlay_widget. (b) In main() function, create the overlay widget instance after JarvisUI is created. (c) Modify _on_wake_word callback to call overlay.show_overlay() and overlay.set_state('LISTENING') instead of (or in addition to) ui.show_from_tray(). (d) In JarvisLive.set_speaking(): when value=True, call overlay.set_state('SPEAKING'); when value=False, start a 2-second timer then call overlay.hide_overlay(). (e) When session connects (in run()), set overlay state to LISTENING. (f) When tool is executing (_execute_tool), set overlay state to THINKING. (g) When turn_complete is received in _receive_audio, after response is done and audio finishes, hide overlay after a short delay.",
+    "Update /projects/sandbox/Jarvis_Max/wake_word.py: No changes needed - it already uses a callback pattern that main.py hooks into.",
+    "Update /projects/sandbox/Jarvis_Max/tray_service.py: Add a reference to the overlay widget so that tray context menu can also trigger the overlay (optional, add 'Activate JARVIS' menu item that shows overlay)."
+  ],
+  "acceptance_criteria": [
+    "overlay_widget.py exists and imports without errors (python -c 'from overlay_widget import SiriOverlay')",
+    "SiriOverlay class has methods: show_overlay(), hide_overlay(), set_state(state)",
+    "SiriOverlay uses FramelessWindowHint, WindowStaysOnTopHint, Tool window type, and WA_TranslucentBackground",
+    "Animation uses QPainter with QTimer at ~16ms interval for smooth 60fps",
+    "States LISTENING, SPEAKING, THINKING each produce visually distinct animations",
+    "Fade-in and fade-out animations are implemented with QPropertyAnimation",
+    "main.py integrates overlay: wake word shows it, speaking changes state, session end hides it",
+    "main.py still imports and runs without syntax errors (python -c 'import ast; ast.parse(open(\"main.py\").read())')",
+    "Widget is positioned at bottom-center of primary screen"
+  ],
+  "verification": [
+    "cd /projects/sandbox/Jarvis_Max && python -c \"from overlay_widget import SiriOverlay; print('Import OK')\"",
+    "cd /projects/sandbox/Jarvis_Max && python -c \"import ast; ast.parse(open('overlay_widget.py').read()); print('overlay_widget.py syntax OK')\"",
+    "cd /projects/sandbox/Jarvis_Max && python -c \"import ast; ast.parse(open('main.py').read()); print('main.py syntax OK')\"",
+    "cd /projects/sandbox/Jarvis_Max && python -c \"import ast; ast.parse(open('tray_service.py').read()); print('tray_service.py syntax OK')\""
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

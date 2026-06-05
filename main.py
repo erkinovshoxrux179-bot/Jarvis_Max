@@ -10,6 +10,7 @@ from pathlib import Path
 import sounddevice as sd
 from google import genai
 from google.genai import types
+from PyQt6.QtCore import QTimer
 from ui import JarvisUI
 from memory.memory_manager import (
     load_memory, update_memory, format_memory_for_prompt,
@@ -35,6 +36,7 @@ from actions.game_updater      import game_updater
 from actions.windows_automation import windows_automation
 from actions.windows_max_control import windows_max_control
 from wake_word import WakeWordDetector
+from overlay_widget import SiriOverlay
 
 
 def get_base_dir():
@@ -553,8 +555,9 @@ TOOL_DECLARATIONS = [
 
 class JarvisLive:
 
-    def __init__(self, ui: JarvisUI):
+    def __init__(self, ui: JarvisUI, overlay: SiriOverlay | None = None):
         self.ui             = ui
+        self.overlay        = overlay
         self.session        = None
         self.audio_in_queue = None
         self.out_queue      = None
@@ -580,8 +583,13 @@ class JarvisLive:
             self._is_speaking = value
         if value:
             self.ui.set_state("SPEAKING")
-        elif not self.ui.muted:
-            self.ui.set_state("LISTENING")
+            if self.overlay:
+                self.overlay.set_state("SPEAKING")
+        else:
+            if not self.ui.muted:
+                self.ui.set_state("LISTENING")
+            if self.overlay:
+                QTimer.singleShot(2000, self.overlay.hide_overlay)
 
     def speak(self, text: str):
         if not self._loop or not self.session:
@@ -641,6 +649,8 @@ class JarvisLive:
 
         print(f"[JARVIS] 🔧 {name}  {args}")
         self.ui.set_state("THINKING")
+        if self.overlay:
+            self.overlay.set_state("THINKING")
 
         if name == "save_memory":
             category = args.get("category", "notes")
@@ -928,6 +938,8 @@ class JarvisLive:
                     print("[JARVIS] ✅ Connected.")
                     self.ui.set_state("LISTENING")
                     self.ui.write_log("SYS: JARVIS online.")
+                    if self.overlay:
+                        self.overlay.set_state("LISTENING")
 
                     tg.create_task(self._send_realtime())
                     tg.create_task(self._listen_audio())
@@ -944,6 +956,7 @@ class JarvisLive:
 
 def main():
     ui = JarvisUI("face.png")
+    overlay = SiriOverlay()
 
     # Wake word detection - activates UI when "Jarvis" is heard
     def _on_wake_word():
@@ -951,6 +964,8 @@ def main():
         ui.show_from_tray()
         ui.set_state("LISTENING")
         ui.write_log("SYS: Wake word detected - JARVIS activated.")
+        overlay.show_overlay()
+        overlay.set_state("LISTENING")
 
     wake_detector = WakeWordDetector(
         callback=_on_wake_word,
@@ -967,7 +982,7 @@ def main():
         wake_detector.start()
         ui.write_log("SYS: Wake word detection active. Say 'Jarvis' to activate.")
 
-        jarvis = JarvisLive(ui)
+        jarvis = JarvisLive(ui, overlay=overlay)
         try:
             asyncio.run(jarvis.run())
         except KeyboardInterrupt:

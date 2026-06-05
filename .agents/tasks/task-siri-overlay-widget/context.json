@@ -1,0 +1,21 @@
+{
+  "project_type": "Python PyQt6 desktop AI assistant with Google Gemini Live Audio API",
+  "language": "Python 3.11+",
+  "build_system": "pip install -r requirements.txt, no formal build step for development",
+  "test_framework": "No test framework - manual testing only",
+  "build_command": "python -c \"import PyQt6; import sounddevice; print('OK')\"",
+  "test_command": "python -c \"from overlay_widget import SiriOverlay; print('overlay_widget imports OK')\"",
+  "verification_instructions": "1. Verify overlay_widget.py imports without errors. 2. Verify main.py imports without errors. 3. Verify wake_word.py imports without errors. 4. Verify tray_service.py imports without errors. 5. Check that all new code follows PyQt6 patterns from ui.py.",
+  "snapshot_or_generated_files": null,
+  "setup_instructions": "pip install -r requirements.txt (requires sounddevice, PyQt6, google-genai, etc.)",
+  "environment_constraints": "OPEN_INTERNET network mode. Python 3.11 available. No display server available in sandbox (headless), so PyQt6 widgets cannot actually render, but import/syntax validation is possible.",
+  "contribution_requirements": "No formal CONTRIBUTING.md. Follow existing code patterns in ui.py (QPainter animations, QTimer, color scheme from class C).",
+  "key_patterns": "1. HudCanvas in ui.py uses QPainter + QTimer(16ms) for smooth 60fps animation. 2. Colors defined in class C (cyan/blue theme). 3. States: LISTENING, SPEAKING, THINKING, MUTED. 4. JarvisUI is the public API wrapper around MainWindow. 5. WakeWordDetector uses callback pattern - calls callback() when wake word detected. 6. main.py main() creates JarvisUI then WakeWordDetector with _on_wake_word callback. 7. JarvisLive.set_speaking() changes state between SPEAKING/LISTENING. 8. TrayService manages system tray icon. 9. Signals used for cross-thread UI updates: _log_sig, _state_sig.",
+  "relevant_files": [
+    "ui.py",
+    "main.py",
+    "wake_word.py",
+    "tray_service.py"
+  ],
+  "directory_structure": "Root-level Python files: main.py (entry), ui.py (full UI), wake_word.py (detection), tray_service.py (tray). Subdirs: actions/ (tool implementations), agent/ (task planning), config/ (settings), core/ (prompt), memory/ (persistence)."
+}
