@@ -1,4 +1,5 @@
 import asyncio
+import atexit
 import re
 import threading
 import json
@@ -32,6 +33,9 @@ from actions.web_search        import web_search as web_search_action
 from actions.computer_control  import computer_control
 from actions.game_updater      import game_updater
 from actions.windows_automation import windows_automation
+from actions.windows_max_control import windows_max_control
+from wake_word import WakeWordDetector
+from overlay_widget import SiriOverlay
 
 
 def get_base_dir():
@@ -403,6 +407,41 @@ TOOL_DECLARATIONS = [
         }
     },
     {
+        "name": "windows_max_control",
+        "description": (
+            "Advanced Windows system control. Use for: managing Windows services, "
+            "registry operations, sending notifications, clipboard management, "
+            "virtual desktops, startup programs, environment variables, "
+            "listing installed apps, Windows Update status, firewall/defender control, "
+            "taskbar management, context menu customization, and system information. "
+            "Always use this for deep Windows system operations."
+        ),
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "action": {
+                    "type": "STRING",
+                    "description": (
+                        "services | registry | notification | clipboard | virtual_desktop | "
+                        "startup | env_vars | installed_apps | windows_update | firewall | "
+                        "defender | taskbar | context_menu | system_info"
+                    )
+                },
+                "sub_action": {
+                    "type": "STRING",
+                    "description": "Sub-action specific to each action type (e.g., list/start/stop for services)"
+                },
+                "name": {"type": "STRING", "description": "Service name, app name, variable name, etc."},
+                "value": {"type": "STRING", "description": "Value to set (for registry, env_vars, etc.)"},
+                "key_path": {"type": "STRING", "description": "Registry key path"},
+                "title": {"type": "STRING", "description": "Notification title"},
+                "message": {"type": "STRING", "description": "Notification message or content"},
+                "confirmed": {"type": "STRING", "description": "Use confirmed=yes for dangerous operations"},
+            },
+            "required": ["action"]
+        }
+    },
+    {
         "name": "shutdown_jarvis",
         "description": (
             "Shuts down the assistant completely. "
@@ -515,8 +554,9 @@ TOOL_DECLARATIONS = [
 
 class JarvisLive:
 
-    def __init__(self, ui: JarvisUI):
+    def __init__(self, ui: JarvisUI, overlay: SiriOverlay | None = None):
         self.ui             = ui
+        self.overlay        = overlay
         self.session        = None
         self.audio_in_queue = None
         self.out_queue      = None
@@ -542,8 +582,14 @@ class JarvisLive:
             self._is_speaking = value
         if value:
             self.ui.set_state("SPEAKING")
-        elif not self.ui.muted:
-            self.ui.set_state("LISTENING")
+            if self.overlay:
+                self.overlay.set_state("SPEAKING")
+        else:
+            if not self.ui.muted:
+                self.ui.set_state("LISTENING")
+            if self.overlay:
+                self.overlay.set_state("IDLE")
+                self.overlay.schedule_delayed_hide(2000)
 
     def speak(self, text: str):
         if not self._loop or not self.session:
@@ -603,6 +649,8 @@ class JarvisLive:
 
         print(f"[JARVIS] 🔧 {name}  {args}")
         self.ui.set_state("THINKING")
+        if self.overlay:
+            self.overlay.set_state("THINKING")
 
         if name == "save_memory":
             category = args.get("category", "notes")
@@ -708,6 +756,10 @@ class JarvisLive:
 
             elif name == "windows_automation":
                 r = await loop.run_in_executor(None, lambda: windows_automation(parameters=args, player=self.ui))
+                result = r or "Done."
+
+            elif name == "windows_max_control":
+                r = await loop.run_in_executor(None, lambda: windows_max_control(parameters=args, player=self.ui))
                 result = r or "Done."
 
             elif name == "shutdown_jarvis":
@@ -886,6 +938,8 @@ class JarvisLive:
                     print("[JARVIS] ✅ Connected.")
                     self.ui.set_state("LISTENING")
                     self.ui.write_log("SYS: JARVIS online.")
+                    if self.overlay:
+                        self.overlay.set_state("LISTENING")
 
                     tg.create_task(self._send_realtime())
                     tg.create_task(self._listen_audio())
@@ -902,14 +956,42 @@ class JarvisLive:
 
 def main():
     ui = JarvisUI("face.png")
+    overlay = SiriOverlay()
+
+    # Wire overlay to TrayService so "Activate JARVIS" menu item works
+    if hasattr(ui._win, '_tray') and ui._win._tray:
+        ui._win._tray.set_overlay(overlay)
+
+    # Wake word detection - activates UI when "Jarvis" is heard
+    def _on_wake_word():
+        print("[JARVIS] Wake word detected!")
+        ui.show_from_tray()
+        ui.set_state("LISTENING")
+        ui.write_log("SYS: Wake word detected - JARVIS activated.")
+        overlay.show_overlay()
+        overlay.set_state("LISTENING")
+
+    wake_detector = WakeWordDetector(
+        callback=_on_wake_word,
+        keywords=["jarvis", "hey jarvis", "salom jarvis"],
+        energy_threshold=600,
+        cooldown_seconds=5.0,
+    )
+
+    atexit.register(wake_detector.stop)
 
     def runner():
         ui.wait_for_api_key()
-        jarvis = JarvisLive(ui)
+        # Start wake word detection after API key is set
+        wake_detector.start()
+        ui.write_log("SYS: Wake word detection active. Say 'Jarvis' to activate.")
+
+        jarvis = JarvisLive(ui, overlay=overlay)
         try:
             asyncio.run(jarvis.run())
         except KeyboardInterrupt:
-            print("\n🔴 Shutting down...")
+            print("\n[JARVIS] Shutting down...")
+            wake_detector.stop()
 
     threading.Thread(target=runner, daemon=True).start()
     ui.root.mainloop()

@@ -1,0 +1,26 @@
+{
+  "id": "FEAT-001",
+  "type": "feat",
+  "description": "Update system prompt for Uzbek language support, create windows_max_control.py with comprehensive Windows control functions, and add wake word detection module",
+  "status": "completed",
+  "steps": [
+    "Step 1: Update core/prompt.txt - Add Uzbek language instructions telling JARVIS to understand and respond in Uzbek, auto-translate tool parameters from Uzbek to English, and behave like a loyal assistant always ready to help",
+    "Step 2: Create actions/windows_max_control.py with the following sub-actions: system_tray (get tray icons info), taskbar (pin/unpin/settings), start_menu (open/search), registry (read/write/delete keys), services (list/start/stop/restart), notifications (send toast notification), clipboard (get/set/history), virtual_desktop (create/switch/close), multi_monitor (list/set-primary/move-window), firewall (enable/disable/add-rule), defender (scan/status/toggle), context_menu (add/remove entries), startup_programs (list/add/remove), env_vars (get/set/delete), windows_update (check-status), installed_apps (list all). Each sub-action should be a function, with the main entry point dispatching by 'action' parameter. Follow the same signature pattern as windows_automation.py: windows_max_control(parameters=dict, response=None, player=None)",
+    "Step 3: Create wake_word.py in the project root - a module that uses sounddevice to continuously listen for 'Jarvis' or 'Hey Jarvis' wake word using simple energy-based detection with keyword spotting via vosk or a simpler approach using audioop for energy detection combined with the Gemini API for wake word verification. The module should emit a callback when wake word is detected.",
+    "Step 4: Update requirements.txt - Add new dependencies: pystray, plyer (for notifications), keyboard (for global hotkeys), vosk (for wake word)"
+  ],
+  "acceptance_criteria": [
+    "core/prompt.txt contains clear Uzbek language instructions",
+    "actions/windows_max_control.py exists with all listed sub-actions implemented",
+    "wake_word.py exists with a WakeWordDetector class that has start/stop methods",
+    "requirements.txt includes new dependencies",
+    "All new Python files pass syntax check (python -c 'import ast; ast.parse(open(file).read())')"
+  ],
+  "verification": [
+    "python -c \"import ast; ast.parse(open('actions/windows_max_control.py').read()); print('OK')\"",
+    "python -c \"import ast; ast.parse(open('wake_word.py').read()); print('OK')\"",
+    "python -c \"f=open('core/prompt.txt','r',encoding='utf-8'); content=f.read(); assert 'uzbek' in content.lower() or 'o\\'zbek' in content.lower(); print('OK')\""
+  ],
+  "blocked_reason": null,
+  "findings": "Used pyenv global 3.11.15 to set Python version. All syntax checks pass. The winreg import in windows_max_control.py is inside function bodies so it only runs on Windows. audioop module is available in Python 3.11 (deprecated in 3.13+)."
+}
